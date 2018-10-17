@@ -1,0 +1,250 @@
+
+% CS534 implementation assignment 2
+
+\documentclass{article}
+
+\usepackage{subcaption}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{amsmath,amsthm,amssymb}
+\usepackage[linesnumbered, ruled]{algorithm2e}
+\SetKwRepeat{Do}{do}{while}%
+\usepackage{titlesec}
+
+\renewcommand{\labelenumi}{(\alph{enumi})}
+\renewcommand{\vec}[1]{\mathbf{#1}}
+%\algdef{SE}[DOWHILE]{Do}{doWhile}{\algorithmicdo}[1]{\algorithmicwhile\ #1}%
+
+\titleformat{\section}
+  {\normalfont\fontsize{12}{15}\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}
+  {\normalfont\fontsize{10}{12}\bfseries}{\thesubsection}{1em}{}
+
+\begin{document}
+
+\begin{center}
+	{\huge CS-534 Machine Learning} \\ \vspace{2mm}
+	{\Large Implementation Assignment 2} \\ \vspace{2mm} \hrule \vspace{3mm}
+	{\normalsize Mohammand Velayati ($33.\bar{3}$\%) \hspace{3mm}  Lucas Wells ($33.\bar{3}$\%) \hspace{3mm}  Chirag Shah ($33.\bar{3}$\%)} 
+\end{center}
+
+\section{Introduction}
+
+In this assignment we are given a set of tweets from Hillary Clinton's and Donald Trump's Twitter accounts. We will train a Na\"{i}ve Bayes classifier to predict the account that a new tweet comes from. Throughout this document we use the variable $C$ to represent the account that a given tweet comes from, Hillary's or Trump's, and $\vec{x}$ represents a tweet, such that each $x_i$ is a single word in the tweet $\vec{x}$ of class $C$. Also, let $V$ be the vocabulary of unique words found in all tweets of the training set.
+
+\subsection{The Na\"{i}ve Bayes classifier}
+
+The Na\"{i}ve Bayes classifier is based on Bayes' Theorem,
+
+\begin{align}
+p(C|\vec{x}) = \frac{p(C)p(\vec{x}|C)}{p(\vec{x})} \propto p(C)p(\vec{x}|C),
+\end{align}
+
+\noindent
+that states that the probability of of observing a class $C$, given a set of features $\vec{x}$, is equal to the prior probability of observing class $C$ times the likelihood of the feature begin in that class divided by the evidence $p(\vec{x})$. As the denominator does not depend on the class we can state that the probability of observing a class is proportional to the numerator. This is equivalent to the joint probability $p(C, x_1, \dots, x_n)$. In practice this computation on high dimensional features is prohibitive since we must estimate $k \times (2^d - 1)$ parameters. Na\"{i}ve Bayes relaxes the conditional probability model and assumes that each feature is conditionally independent from all other features. Thus, we can write the conditional distribution over $C$ as
+
+
+\begin{align}
+p(C|x_1, \dots ,x_n) \propto p(C)\prod^n_{i=1} p(x_i|C).
+\end{align}
+
+\noindent
+Combining the Na\"{i}ve Bayes probability model with the Maximum A Posteriori (MAP) decision rule we get
+
+\begin{align}
+\hat{y} = \underset{k \in \{1,\dots,K\}}{\rm{argmax}} \hspace{2mm} p(C_k)\prod^n_{i=1}p(x_i|C_k).
+\end{align}
+
+\noindent
+We will compare the performance of two Na\"{i}ve Bayes event models, Bernoulli and Multinomial, on our Twitter classification problem.
+
+\subsection{Bernoulli event model}
+
+In the Bernoulli event model we represent tweets as binary vectors, so each word  $x_i \in \{0,1\}$ and $|\vec{x}| = |V|$. Thus, $x_i = 1$ means that the word $V_i$ is contained in the tweet at least once, and $x_i = 0$ means that word $V_i$ is not in the tweet $\vec{x}$. In the Bernoulli model we use
+
+\begin{align}
+p(\vec{x}|C) = \prod^{|V|}_{i=1} p_{x_i|C}^{x_i}(1-p_{x_i|C})^{(1-x_i)}
+\end{align}
+
+\noindent
+to compute the likelihood that a given tweet $\vec{x}$ is from account $C$. And the likelihood that word $x_i$ is found in class $C_k$ is estimated by
+
+\begin{align}
+p_{x_i|C_k} = \frac{n_k(x_i)}{N_k},
+\end{align}
+
+\noindent
+where $n_k(x_i)$ denotes the number of occurrences of word $x_i$ in class $k$ and $N_k$ is the number of tweets from class $k$. Since the product of many probabilities could result in underflow, we compute the log of the likelihoods by
+
+\begin{align}
+\mathrm{log} \hspace{1mm} p(\vec{x}|C) &= \mathrm{log}\Big(\prod^{|V|}_{i=1} p_{x_i|C}^{x_i} (1-p_{x_i|C})^{(1-x_i)}\Big) \\
+                     &= \sum_{i=1}^{|V|} \lbrack x_i \cdot \mathrm{log} \hspace{1mm} p_{x_i|C} + (1-x_i)\mathrm{log}(1-p_{x_i|C}) \rbrack.
+\end{align}
+
+\noindent
+Combining equations (1) and (7) we perform MAP estimation in log space with
+
+\begin{align}
+\hat{y} = \underset{k \in \{1,\dots,K\}}{\rm{argmax}} \hspace{2mm} \mathrm{log}\hspace{1mm} p(C_k)\sum_{i=1}^{|V|} \lbrack x_i \cdot \mathrm{log} \hspace{1mm} p_{x_i|C_k} + (1-x_i)\mathrm{log}(1-p_{x_i|C_k}) \rbrack.
+\end{align}
+
+\noindent
+The priors for each class are calculated using Maximum Likelihood Estimation
+
+\begin{align}
+p(C_k) = \frac{N_k}{N},
+\end{align}
+
+\noindent
+where $N$ is the total number of tweets in both classes.
+
+\subsection{Multinomial event model}
+
+In the Multinomial case we represent tweets as integer vectors, so each word $x_i \in \mathbb{Z}$, where each element $x_i$ denotes the frequency of that word in the tweet. The likelihood is given by
+
+\begin{align}
+p(\vec{x}|C) = \prod^{|V|}_{i=1} p_{x_i|C}^{x_i},
+\end{align}
+
+\noindent
+and the probability $p_{x_i|C_k}$ is the relative frequency of word $x_i$ in tweets of class $k$ divided by the total number of words in the tweets of that class. Mathematically, this can be expressed as
+
+\begin{align}
+p_{x_i|C_k} = \frac{\sum^N_{j=1} x_{ji}b_{jk}}{\sum^{|V|}_{m=1}\sum^{N}_{j=1} x_{jm} b_{jk}},
+\end{align}
+
+\noindent
+where $b_{jk}$ is an indicator variable that equal 1 when $x_i$ is of class $C=k$, and 0 otherwise. The estimate for all word likelihood in log space is then given by
+
+
+\begin{align}
+\mathrm{log} \hspace{1mm} p(\vec{x}|C) &= \mathrm{log}\Big(\prod^{|V|}_{i=1} p_{x_i|C}^{x_i}\Big) \\
+                     &= \sum_{i=1}^{|V|} \lbrack x_i \cdot \mathrm{log} \hspace{1mm} p_{x_i|C} \rbrack.
+\end{align}
+
+\noindent
+Finally, combining equations (1) and (13) we perform MAP estimation with
+
+\begin{align}
+\hat{y} = \underset{k \in \{1,\dots,K\}}{\rm{argmax}} \hspace{2mm} \mathrm{log}\hspace{1mm} p(C_k)\sum_{i=1}^{|V|} \lbrack x_i \cdot \mathrm{log} \hspace{1mm} p_{x_i|C_k} \rbrack,
+\end{align}
+
+\noindent
+where the priors are calculated using equation (9).
+
+\section{Implementation}
+
+\begin{enumerate}
+
+\item [1.] (5 pts) Please explain how you use the log of probability to perform classification
+
+\item [2.] (5 pts) Report the overall testing accuracy (number of correctly classified documents over the total number of documents) for both (Bernoulli and Multinomial) models.
+
+\begin{table}[!htb]
+\centering
+\caption{Overall testing accuracy for each model}
+\begin{tabular}{|r|c|} \hline
+	Model & testing accuracy \\ \hline
+	Bernoulli & 92.39\% \\ \hline
+	Multinomial & 92.70\% \\ \hline
+\end{tabular}
+\end{table}
+
+\item [3.] (5 pts) Whose tweets were confused more often than the other? Why do you think this is?
+
+\begin{table}[!htb]
+    \caption{Confusion matrices. $H$ denotes Hillary Clinton's account and $T$ for Trump's account.}
+    \begin{subtable}{.5\linewidth}
+      \centering
+        \caption{Bernoulli model}
+        \begin{tabular}{|c|c|c|} \hline
+            class & $y=H$ & $y=T$ \\ \hline
+            $\hat{y}=H$ & 47.20 & 5.12 \\ \hline
+	    $\hat{y}=T$ & 2.48 & 45.19 \\ \hline
+        \end{tabular}
+    \end{subtable}%
+    \begin{subtable}{.5\linewidth}
+      \centering
+        \caption{Multinomial model}
+        \begin{tabular}{|c|c|c|} \hline
+            class & $y=H$ & $y=T$\\ \hline
+            $\hat{y}=H$ & 47.20 & 4.81 \\ \hline
+	    $\hat{y}=T$ & 2.48 & 45.50 \\ \hline
+        \end{tabular}
+    \end{subtable} 
+\end{table}
+
+\item [4.] (5 pts) Identify, for each class, the top ten words that have the highest probability.
+
+\begin{table}[!htb]
+\centering
+\caption{Top ten most likely words from each account}
+\begin{tabular}{|r|l|l|} \hline
+	Rank & $H$ & $T$ \\ \hline
+	1 & make & great \\ \hline
+	2 & people & The \\ \hline
+	3 & America &  \#MakeAmericaGreatAgain \\ \hline
+	4 & president & Trump \\ \hline
+	5 & can & @realDonaldTrump \\ \hline
+	6 & I & \#Trump2016 \\ \hline
+	7 & We & Hillary \\ \hline
+	8 & Donald & Thank \\ \hline
+	9 & Hillary & will \\ \hline
+	10 & Trump & I \\ \hline
+\end{tabular}
+\end{table}
+
+
+
+
+\end{enumerate}
+
+\subsection{Priors and overfitting (20 pts)}
+
+\subsection{Identifying important features (20 pts)}
+
+We explored methods for reducing the vocabulary size to reduce the dimensionality of features and improve performance of classification.  Intuitively we can think of the discriminative power of a word as the difference in the likelihood of that word appearing in one class versus the other. That is, for a given word $x_i$, the absolute difference of the likelihood $p_{x_i|C_k}$ where $k=0$ and $k=1$. Thus, as an example, if a word is very likely to appear in both classes, then the difference is small and it is said to have little discriminative power. This can be written as
+\begin{align}
+\Delta \ell(\vec{x}_{\ell|k}) = |\vec{x}_{\ell|k=0} - \vec{x}_{\ell|k=1}|,
+\end{align}
+
+\noindent
+where $\vec{x}_{\ell|k} = \{p_{x_i|C_k}; \forall i,k\}$ given by equation (5) for the Bernoulli case and (11) in the Multinomial case. A new vocabulary set is generated by
+
+\begin{align}
+V^{\prime} = \{x_{m,\sigma} | x_{m,\sigma} = \underset{\vec{x}_{\ell|k}}{\mathrm{argmax}}^\sigma \{\Delta \ell(\vec{x}_{\ell|k})\}, \sigma \in \{1, \dots ,\Sigma\}\},
+\end{align}
+
+\noindent
+where the notation $\mathrm{argmax}^\sigma$ denotes a set of $\Sigma$ maximum word likelihood differences. The number of words in the new vocabulary set is controlled by parameter $\lambda$ in 
+
+\begin{align}
+\Sigma = \lfloor|V| \cdot (1-\lambda)\rfloor.
+\end{align}
+
+\noindent
+We tested the effect of $\lambda$ values in the range $(0.1,\dots,0.9)$ on the classification accuracy of each model and the size of the vocabulary (Table 4).
+
+\begin{table}[!htb]
+\centering
+\caption{Change in model accuracy resulting from vocabulary reduction. Bold face values indicate the best classification accuracy for each model.}
+\begin{tabular}{|c|c|c|c|} \hline
+	$\lambda$ & Bernoulli accuracy (\%) & Multinomial accuracy (\%) & $|V^{\prime}|$ \\ \hline
+	0.1 & 92.24 & 92.70 & 12,061 \\ \hline
+	0.2 & 92.08 & 93.01 & 10,721 \\ \hline
+	0.3 & 90.99 & \textbf{93.17} & 9,381 \\ \hline
+	0.4 & 90.22 & 92.86 & 8,041 \\ \hline
+	0.5 & 91.61 & 92.85 & 6,701 \\ \hline
+	0.6 & 92.55 & 92.70 & 5,361 \\ \hline
+	0.7 & \textbf{93.17} & 92.55 & 4,021 \\ \hline
+	0.8 & 91.77 & 92.39 & 2,681 \\ \hline
+	0.9 & 90.53 & 90.06 & 1,341 \\ \hline
+\end{tabular}
+\end{table}
+
+\noindent
+In both models, the accuracy can slightly improved by retaining only words with relatively large discriminative power in the dictionary. For the Bernoulli case, this improvement is highest at a 70\% reduction in vocabulary size. And for the Multinomial case, at 30\% reduction. In both cases, a comparable classification accuracy can be achieved while reducing the vocabulary size to 90\% of it's original dimension.
+
+\subsection{Bonus}
+
+\end{document}
